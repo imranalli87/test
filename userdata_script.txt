@@ -1,0 +1,10 @@
+#!/bin/bash
+
+#Remove current web content being served
+sudo rm -r /opt/bitnami/apache2/htdocs/*
+
+#Download and install website from my S3 bucket
+sudo curl https://s3.ca-central-1.amazonaws.com/lab-bucket-trinimbus87/website.zip --output /opt/bitnami/apache2/htdocs/website.zip
+sudo unzip /opt/bitnami/apache2/htdocs/website.zip -d /opt/bitnami/apache2/htdocs/
+
+

@@ -1,0 +1,446 @@
+#!/bin/bash
+
+#Read config file to store user's parameters as variables
+VPCNAME=$(grep -oP '(?<="VPCNAME": ")[^"]*' deployment_inputs.txt)
+VPC_CIDR=$(grep -oP '(?<="VPC_CIDR": ")[^"]*' deployment_inputs.txt)
+WebSubnet1a_Tag=$(grep -oP '(?<="WebSubnet1a_Tag": ")[^"]*' deployment_inputs.txt)
+WebSubnet1a_CIDR=$(grep -oP '(?<="WebSubnet1a_CIDR": ")[^"]*' deployment_inputs.txt)
+WebSubnet1b_Tag=$(grep -oP '(?<="WebSubnet1b_Tag": ")[^"]*' deployment_inputs.txt)
+WebSubnet1b_CIDR=$(grep -oP '(?<="WebSubnet1b_CIDR": ")[^"]*' deployment_inputs.txt)
+DBSubnet1a_Tag=$(grep -oP '(?<="DBSubnet1a_Tag": ")[^"]*' deployment_inputs.txt)
+DBSubnet1a_CIDR=$(grep -oP '(?<="DBSubnet1a_CIDR": ")[^"]*' deployment_inputs.txt)
+DBSubnet1b_Tag=$(grep -oP '(?<="DBSubnet1b_Tag": ")[^"]*' deployment_inputs.txt)
+DBSubnet1b_CIDR=$(grep -oP '(?<="DBSubnet1b_CIDR": ")[^"]*' deployment_inputs.txt)
+PublicSubnet1a_Tag=$(grep -oP '(?<="PublicSubnet1a_Tag": ")[^"]*' deployment_inputs.txt)
+PublicSubnet1a_CIDR=$(grep -oP '(?<="PublicSubnet1a_CIDR": ")[^"]*' deployment_inputs.txt)
+PublicSubnet1b_Tag=$(grep -oP '(?<="PublicSubnet1b_Tag": ")[^"]*' deployment_inputs.txt)
+PublicSubnet1b_CIDR=$(grep -oP '(?<="PublicSubnet1b_CIDR": ")[^"]*' deployment_inputs.txt)
+InternetGateway_Tag=$(grep -oP '(?<="InternetGateway_Tag": ")[^"]*' deployment_inputs.txt)
+IP_Allocation1__Tag=$(grep -oP '(?<="IP_Allocation1__Tag": ")[^"]*' deployment_inputs.txt)
+IP_Allocation2__Tag=$(grep -oP '(?<="IP_Allocation2__Tag": ")[^"]*' deployment_inputs.txt)
+NatGatewayId1a_Tag=$(grep -oP '(?<="NatGatewayId1a_Tag": ")[^"]*' deployment_inputs.txt)
+NatGatewayId1b_Tag=$(grep -oP '(?<="NatGatewayId1b_Tag": ")[^"]*' deployment_inputs.txt)
+MainRouteTable_Tag=$(grep -oP '(?<="MainRouteTable_Tag": ")[^"]*' deployment_inputs.txt)
+InternalRouteTable1a_Tag=$(grep -oP '(?<="InternalRouteTable1a_Tag": ")[^"]*' deployment_inputs.txt)
+InternalRouteTable1b_Tag=$(grep -oP '(?<="InternalRouteTable1b_Tag": ")[^"]*' deployment_inputs.txt)
+WebSecGroup_Tag=$(grep -oP '(?<="WebSecGroup_Tag": ")[^"]*' deployment_inputs.txt)
+DBSecGroup_Tag=$(grep -oP '(?<="DBSecGroup_Tag": ")[^"]*' deployment_inputs.txt)
+RDS_SubnetGroup_Name=$(grep -oP '(?<="RDS_SubnetGroup_Name": ")[^"]*' deployment_inputs.txt)
+RDS_InstanceIdentifier=$(grep -oP '(?<="RDS_InstanceIdentifier": ")[^"]*' deployment_inputs.txt)
+RDS_DB_Name=$(grep -oP '(?<="RDS_DB_Name": ")[^"]*' deployment_inputs.txt)
+RDS_DB_Username=$(grep -oP '(?<="RDS_DB_Username": ")[^"]*' deployment_inputs.txt)
+RDS_DB_Password=$(grep -oP '(?<="RDS_DB_Password": ")[^"]*' deployment_inputs.txt)
+EC2_Instance1a_Tag=$(grep -oP '(?<="EC2_Instance1a_Tag": ")[^"]*' deployment_inputs.txt)
+EC2_Instance1b_Tag=$(grep -oP '(?<="EC2_Instance1b_Tag": ")[^"]*' deployment_inputs.txt)
+ELB_Tag=$(grep -oP '(?<="ELB_Tag": ")[^"]*' deployment_inputs.txt)
+ELBSecGroup_Tag=$(grep -oP '(?<="ELBSecGroup_Tag": ")[^"]*' deployment_inputs.txt)
+ELBTargetGroup_Tag=$(grep -oP '(?<="ELBTargetGroup_Tag": ")[^"]*' deployment_inputs.txt)
+
+#Create VPC and store VPC ID
+aws ec2 create-vpc \
+ --cidr-block $VPC_CIDR | grep -oP '(?<="VpcId": ")[^"]*' > VpcId.txt
+
+#Tag VPC
+VPCID=$(cat VpcId.txt)
+
+aws ec2 create-tags \
+ --resources $VPCID \
+ --tags Key=Name,Value=$VPCNAME
+
+sleep 2
+echo "Creating VPC..."
+
+
+#Create subnets for web servers, database and public subnets for load balancer
+aws ec2 create-subnet \
+ --vpc-id $VPCID \
+ --availability-zone ca-central-1a \
+ --cidr-block $WebSubnet1a_CIDR | grep -oP '(?<="SubnetId": ")[^"]*' > WebSubnet1a_ID.txt
+
+aws ec2 create-subnet \
+ --vpc-id $VPCID \
+ --availability-zone ca-central-1b \
+ --cidr-block $WebSubnet1b_CIDR | grep -oP '(?<="SubnetId": ")[^"]*' > WebSubnet1b_ID.txt
+
+aws ec2 create-subnet \
+ --vpc-id $VPCID \
+ --availability-zone ca-central-1a \
+ --cidr-block $DBSubnet1a_CIDR | grep -oP '(?<="SubnetId": ")[^"]*' > DBSubnet1a_ID.txt
+
+aws ec2 create-subnet \
+ --vpc-id $VPCID \
+ --availability-zone ca-central-1b \
+ --cidr-block $DBSubnet1b_CIDR | grep -oP '(?<="SubnetId": ")[^"]*' > DBSubnet1b_ID.txt
+
+ aws ec2 create-subnet \
+ --vpc-id $VPCID \
+ --availability-zone ca-central-1a \
+ --cidr-block $PublicSubnet1a_CIDR | grep -oP '(?<="SubnetId": ")[^"]*' > PublicSubnet1a_ID.txt
+
+aws ec2 create-subnet \
+ --vpc-id $VPCID \
+ --availability-zone ca-central-1b \
+ --cidr-block $PublicSubnet1b_CIDR | grep -oP '(?<="SubnetId": ")[^"]*' > PublicSubnet1b_ID.txt
+
+
+#Tag subnets
+WebSubnet1a_ID=$(cat WebSubnet1a_ID.txt)
+WebSubnet1b_ID=$(cat WebSubnet1b_ID.txt)
+DBSubnet1a_ID=$(cat DBSubnet1a_ID.txt)
+DBSubnet1b_ID=$(cat DBSubnet1b_ID.txt)
+PublicSubnet1a_ID=$(cat PublicSubnet1a_ID.txt)
+PublicSubnet1b_ID=$(cat PublicSubnet1b_ID.txt)
+
+aws ec2 create-tags \
+ --resources $WebSubnet1a_ID \
+ --tags Key=Name,Value=$WebSubnet1a_Tag
+
+aws ec2 create-tags \
+ --resources $WebSubnet1b_ID \
+ --tags Key=Name,Value=$WebSubnet1b_Tag
+
+aws ec2 create-tags \
+ --resources $DBSubnet1a_ID \
+ --tags Key=Name,Value=$DBSubnet1a_Tag
+
+aws ec2 create-tags \
+ --resources $DBSubnet1b_ID \
+ --tags Key=Name,Value=$DBSubnet1b_Tag
+
+aws ec2 create-tags \
+ --resources $PublicSubnet1a_ID \
+ --tags Key=Name,Value=$PublicSubnet1a_Tag
+
+aws ec2 create-tags \
+ --resources $PublicSubnet1b_ID \
+ --tags Key=Name,Value=$PublicSubnet1b_Tag
+
+sleep 2
+echo "Creating Subnets..."
+
+
+#Create Internet Gateway and attach to VPC
+aws ec2 create-internet-gateway | grep -oP '(?<="InternetGatewayId": ")[^"]*' > InternetGatewayId.txt
+InternetGatewayId=$(cat InternetGatewayId.txt)
+
+aws ec2 attach-internet-gateway \
+ --internet-gateway-id $InternetGatewayId \
+ --vpc-id $VPCID
+
+#Tag Internet Gateway
+aws ec2 create-tags \
+ --resources $InternetGatewayId \
+ --tags Key=Name,Value=$InternetGateway_Tag
+
+sleep 2
+echo "Creating Internet Gateway..."
+
+#Allocate and tag elastic IP's for use with NAT gateway
+aws ec2 allocate-address \
+ --domain vpc | grep -oP '(?<="AllocationId": ")[^"]*' > IP_Allocation_Id1.txt
+
+ aws ec2 allocate-address \
+  --domain vpc | grep -oP '(?<="AllocationId": ")[^"]*' > IP_Allocation_Id2.txt
+
+IP_Allocation_Id1=$(cat IP_Allocation_Id1.txt)
+IP_Allocation_Id2=$(cat IP_Allocation_Id2.txt)
+
+aws ec2 create-tags \
+ --resources $IP_Allocation_Id1 \
+ --tags Key=Name,Value=$IP_Allocation1__Tag
+
+aws ec2 create-tags \
+ --resources $IP_Allocation_Id2 \
+ --tags Key=Name,Value=$IP_Allocation2__Tag
+
+
+#Create and tag NAT gateways (1 in each AZ)
+aws ec2 create-nat-gateway \
+ --subnet-id $PublicSubnet1a_ID \
+ --allocation-id $IP_Allocation_Id1 | grep -oP '(?<="NatGatewayId": ")[^"]*' > NatGatewayId1a.txt
+
+aws ec2 create-nat-gateway \
+ --subnet-id $PublicSubnet1b_ID \
+ --allocation-id $IP_Allocation_Id2 | grep -oP '(?<="NatGatewayId": ")[^"]*' > NatGatewayId1b.txt
+
+NatGatewayId1a=$(cat NatGatewayId1a.txt)
+NatGatewayId1b=$(cat NatGatewayId1b.txt)
+
+aws ec2 create-tags \
+ --resources $NatGatewayId1a \
+ --tags Key=Name,Value=$NatGatewayId1a_Tag
+
+aws ec2 create-tags \
+ --resources $NatGatewayId1b \
+ --tags Key=Name,Value=$NatGatewayId1b_Tag
+
+sleep 2
+echo "Creating NAT Gateways..."
+
+# Add default route to main route table to route to Internet Gateway.
+aws ec2 describe-route-tables \
+--filters Name=vpc-id,Values=$VPCID | grep -m 1 -oP '(?<="RouteTableId": ")[^"]*' > MainRouteTableId.txt
+MainRouteTableId=$(cat MainRouteTableId.txt)
+
+aws ec2 create-route \
+ --route-table-id $MainRouteTableId \
+ --destination-cidr-block 0.0.0.0/0 \
+ --gateway-id $InternetGatewayId
+
+#Tag main route table
+aws ec2 create-tags \
+ --resources $MainRouteTableId \
+ --tags Key=Name,Value=$MainRouteTable_Tag
+
+
+#Create and tag additional route tables for private subnets to route to NAT gateway
+aws ec2 create-route-table \
+ --vpc-id $VPCID | grep -m 1 -oP '(?<="RouteTableId": ")[^"]*' > InternalRouteTableId1a.txt
+
+aws ec2 create-route-table \
+ --vpc-id $VPCID | grep -m 1 -oP '(?<="RouteTableId": ")[^"]*' > InternalRouteTableId1b.txt
+
+InternalRouteTableId1a=$(cat InternalRouteTableId1a.txt)
+InternalRouteTableId1b=$(cat InternalRouteTableId1b.txt)
+
+aws ec2 create-tags \
+ --resources $InternalRouteTableId1a \
+ --tags Key=Name,Value=$InternalRouteTable1a_Tag
+
+aws ec2 create-tags \
+ --resources $InternalRouteTableId1b\
+ --tags Key=Name,Value=$InternalRouteTable1b_Tag
+
+
+#Set default routes to route to NAT gateways
+aws ec2 create-route \
+ --route-table-id $InternalRouteTableId1a \
+ --destination-cidr-block 0.0.0.0/0 \
+ --gateway-id $NatGatewayId1a
+
+aws ec2 create-route \
+ --route-table-id $InternalRouteTableId1b \
+ --destination-cidr-block 0.0.0.0/0 \
+ --gateway-id $NatGatewayId1b
+
+#Set private subnets to route to NAT gateway
+aws ec2 associate-route-table \
+ --route-table-id $InternalRouteTableId1a \
+ --subnet-id $WebSubnet1a_ID
+
+aws ec2 associate-route-table \
+ --route-table-id $InternalRouteTableId1a \
+ --subnet-id $DBSubnet1a_ID
+
+aws ec2 associate-route-table \
+ --route-table-id $InternalRouteTableId1b \
+ --subnet-id $WebSubnet1b_ID
+
+aws ec2 associate-route-table \
+ --route-table-id $InternalRouteTableId1b \
+ --subnet-id $DBSubnet1b_ID
+
+sleep 2
+echo "Adding routes..."
+
+#Create security groups and add rules (ports open publicly for simplicity)
+aws ec2 create-security-group \
+ --vpc-id $VPCID \
+ --group-name $WebSecGroup_Tag \
+ --description "Security Group for Web servers" | grep -oP '(?<="GroupId": ")[^"]*' > WebSecGroupID.txt
+
+WebSecGroupID=$(cat WebSecGroupID.txt)
+
+aws ec2 authorize-security-group-ingress \
+ --group-id $WebSecGroupID \
+ --protocol tcp \
+ --port 22 \
+ --cidr 0.0.0.0/0
+
+aws ec2 authorize-security-group-ingress \
+ --group-id $WebSecGroupID \
+ --protocol tcp \
+ --port 80 \
+ --cidr 0.0.0.0/0
+
+aws ec2 authorize-security-group-ingress \
+ --group-id $WebSecGroupID \
+ --protocol tcp \
+ --port 443 \
+ --cidr 0.0.0.0/0
+
+aws ec2 create-security-group \
+ --vpc-id $VPCID \
+ --group-name $DBSecGroup_Tag \
+ --description "Security Group for database" | grep -oP '(?<="GroupId": ")[^"]*' > DBSecGroupID.txt
+
+DBSecGroupID=$(cat DBSecGroupID.txt)
+
+aws ec2 authorize-security-group-ingress \
+ --group-id $DBSecGroupID \
+ --protocol tcp \
+ --port 3306 \
+ --cidr 0.0.0.0/0
+
+aws ec2 create-security-group \
+ --vpc-id $VPCID \
+ --group-name $ELBSecGroup_Tag \
+ --description "Security Group for ELB" | grep -oP '(?<="GroupId": ")[^"]*' > ELBSecGroupID.txt
+
+ELBSecGroupID=$(cat ELBSecGroupID.txt)
+
+aws ec2 authorize-security-group-ingress \
+ --group-id $ELBSecGroupID \
+ --protocol tcp \
+ --port 443 \
+ --cidr 0.0.0.0/0
+
+#Tag security groups
+aws ec2 create-tags \
+ --resources $WebSecGroupID \
+ --tags Key=Name,Value=$WebSecGroup_Tag
+
+aws ec2 create-tags \
+ --resources $DBSecGroupID \
+ --tags Key=Name,Value=$DBSecGroup_Tag
+
+aws ec2 create-tags \
+ --resources $ELBSecGroupID \
+ --tags Key=Name,Value=$ELBSecGroup_Tag
+
+sleep 2
+echo "Creating Security Groups..."
+
+
+
+#Create RDS database (Multi AZ)
+aws rds create-db-subnet-group \
+ --db-subnet-group-name $RDS_SubnetGroup_Name \
+ --db-subnet-group-description "DB subnet group" \
+ --subnet-ids $DBSubnet1a_ID $DBSubnet1b_ID
+
+aws rds create-db-instance \
+ --db-instance-identifier $RDS_InstanceIdentifier \
+ --db-name $RDS_DB_Name \
+ --allocated-storage 20 \
+ --db-instance-class db.t2.micro  \
+ --engine mysql \
+ --multi-az \
+ --master-username $RDS_DB_Username \
+ --master-user-password $RDS_DB_Password \
+ --db-subnet-group-name $RDS_SubnetGroup_Name \
+ --vpc-security-group-ids $DBSecGroupID | grep -m 1 -oP '(?<= "DBInstanceIdentifier": ")[^"]*' > DBInstanceIdentifier.txt
+
+DBInstanceIdentifier=$(cat DBInstanceIdentifier.txt)
+
+sleep 2
+echo "Setting up RDS instance and obtaining RDS endpoint address. This should take 15-20 minutes. Feel free to go grab a coffee or do something while you wait"
+
+#Wait until RDS instance and endpoint address is available
+aws rds wait db-instance-available \
+ --db-instance-identifier $DBInstanceIdentifier
+
+#Obtain RDS endpoint address
+aws rds describe-db-instances --db-instance-identifier $DBInstanceIdentifier | grep -m 1 -oP '(?<= "Address": ")[^"]*' > DB_EndpointAddress.txt
+
+DB_EndpointAddress=$(cat DB_EndpointAddress.txt)
+
+#Pass RDS database login info to userdata_script for use by web app
+echo "sudo echo "host = ""$DB_EndpointAddress " >> /opt/bitnami/apache2/dbconfig.ini" >>  userdata_script.txt
+echo "sudo echo "name = ""$RDS_DB_Name " >> /opt/bitnami/apache2/dbconfig.ini" >>  userdata_script.txt
+echo "sudo echo "user = ""$RDS_DB_Username " >> /opt/bitnami/apache2/dbconfig.ini" >>  userdata_script.txt
+echo "sudo echo "pass = ""$RDS_DB_Password " >> /opt/bitnami/apache2/dbconfig.ini" >>  userdata_script.txt
+
+#Create EC2 instances.
+aws ec2 run-instances \
+ --image-id ami-c14ac9a5 \
+ --count 1 \
+ --instance-type t2.micro \
+ --key-name keypair1_canada_imran87 \
+ --security-group-ids $WebSecGroupID \
+ --subnet-id $WebSubnet1a_ID \
+ --user-data file://userdata_script.txt | grep -m 1 -oP '(?<= "InstanceId": ")[^"]*' > Instance_1a_ID.txt
+
+Instance_1a_ID=$(cat Instance_1a_ID.txt)
+
+aws ec2 run-instances \
+ --image-id ami-c14ac9a5 \
+ --count 1 \
+ --instance-type t2.micro \
+ --key-name keypair1_canada_imran87 \
+ --security-group-ids $WebSecGroupID \
+ --subnet-id $WebSubnet1b_ID \
+ --user-data file://userdata_script.txt | grep -m 1 -oP '(?<= "InstanceId": ")[^"]*' > Instance_1b_ID.txt
+
+Instance_1b_ID=$(cat Instance_1b_ID.txt)
+
+echo "Creating Instances in AZ 1a and 1b..."
+sleep 2
+echo "Waiting for instances to be available..."
+
+#Waiting for instances to be available
+aws ec2 wait instance-status-ok \
+ --instance-ids $Instance_1a_ID $Instance_1b_ID
+
+#Tag EC2 instances
+aws ec2 create-tags \
+ --resources $Instance_1a_ID \
+ --tags Key=Name,Value=$EC2_Instance1a_Tag
+
+aws ec2 create-tags \
+ --resources $Instance_1b_ID \
+ --tags Key=Name,Value=$EC2_Instance1b_Tag
+
+
+#Create Elastic Load Balancer (Application Load Balancer)
+aws elbv2 create-load-balancer \
+ --name $ELB_Tag \
+ --subnets $PublicSubnet1a_ID $PublicSubnet1b_ID \
+ --security-groups $ELBSecGroupID >  LoadBalancerOutput.txt
+
+ELB_DNSName=$(grep -m 1 -oP '(?<="DNSName": ")[^"]*' LoadBalancerOutput.txt)
+LoadBalancerArn=$(grep -m 1 -oP '(?<="LoadBalancerArn": ")[^"]*' LoadBalancerOutput.txt)
+
+#Create ELB Target Group using the default health check configuration
+aws elbv2 create-target-group \
+ --name $ELBTargetGroup_Tag \
+ --protocol HTTP \
+ --port 80 \
+ --vpc-id $VPCID | grep -m 1 -oP '(?<= "TargetGroupArn": ")[^"]*' > TargetGroupArn.txt
+
+TargetGroupArn=$(cat TargetGroupArn.txt)
+
+#Register instances to the Target Group
+aws elbv2 register-targets \
+ --target-group-arn $TargetGroupArn \
+ --targets Id=$Instance_1a_ID Id=$Instance_1b_ID
+
+#Import SSL certificate to AWS Certificate Manager (ACM)
+aws acm import-certificate \
+ --certificate file://server.crt \
+ --private-key file://server.key \
+ --region ca-central-1 | grep -m 1 -oP '(?<= "CertificateArn": ")[^"]*' > SSL_Cert_Arn.txt
+
+SSL_Cert_Arn=$(cat SSL_Cert_Arn.txt)
+
+
+#Create ELB HTTPS Listener
+aws elbv2 create-listener \
+ --load-balancer-arn $LoadBalancerArn \
+ --protocol HTTPS \
+ --port 443 \
+ --certificates CertificateArn=$SSL_Cert_Arn \
+ --ssl-policy ELBSecurityPolicy-2016-08 \
+ --default-actions Type=forward,TargetGroupArn=$TargetGroupArn
+
+
+echo "Setting up load balancer and target groups..."
+sleep 2
+echo "Waiting 3 minutes for ELB targets to be in service..."
+
+sleep 3m
+echo "Done! The web app can at accessed at https://"$ELB_DNSName
+echo "Ensure you use HTTPS!"
+
+
+
